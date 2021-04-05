@@ -80,20 +80,6 @@ function Weather(wethData) {
   this.forecast = wethData.weather.description;
 }
 
-// function parksHandler( request, response ) {
-//   let city = request.query.search_query;
-//   let PARKS_API_KEY = process.env.PARKS_API_KEY;
-//   let parkURL = `https://developer.nps.gov/api/v1/parks?q=${city}&api_key=${PARKS_API_KEY}`;
-//   superagent.get( parkURL )
-//     .then( parkData=>{
-//       let apiData = parkData.body;
-//       // console.log( apiData );
-//       let results = apiData.data.map( element => new Park( element ) );
-//       response.send( results );
-//     } );
-// }
-
-
 function parksRoute(req, res) {
   let city = req.query.search_query;
   let PARKS_API_KEY = process.env.PARKS_API_KEY;
