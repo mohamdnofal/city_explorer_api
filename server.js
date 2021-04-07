@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 4000;
 
 const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  // ssl: { rejectUnauthorized: false }
 });
 
 
@@ -22,6 +22,8 @@ app.get('/', mainRout);
 app.get('/location', locationRoute);
 app.get('/weather', weatherRoute);
 app.get('/parks', parksRoute);
+app.get('/movies', moviesRout);
+app.get('/yelp', yelpRout);
 app.get('*', errorRoute);
 
 
@@ -128,6 +130,69 @@ function Park(data) {
   this.description = data.description;
   this.url = data.url;
 }
+
+// https://mohammad-city-explorer.herokuapp.com/movies?search_query=seattle&formatted_query=Seattle%2C%20King%20County%2C%20Washington%2C%20USA&latitude=47.60383210000000&longitude=-122.33006240000000&page=1
+function moviesRout(req, res) {
+
+  let cityName = req.query.search_query;
+  let MOVIE_API_KEY = process.env.MOVIE_API_KEY;
+  let moviesUrl = `https://api.themoviedb.org/3/search/movie?api_key=${MOVIE_API_KEY}&query=${cityName}`;
+  superagent.get(moviesUrl)
+    .then(value => {
+      let movieData = value.body.results;
+
+      let arr = movieData.map((val) => {
+
+        return new Movie(val);
+      });
+      res.send(arr);
+    })
+    .catch(error => {
+      res.send(error);
+    });
+
+}
+function Movie(data) {
+  this.title = data.original_title;
+  this.overview = data.overview;
+  this.average_votes = data.vote_average;
+  this.total_votes = data.vote_count;
+  this.image_url = `https://image.tmdb.org/t/p/w500${data.poster_path}`;
+  this.popularity = data.popularity;
+  this.released_on = data.release_date;
+}
+function yelpRout(req, res) {
+
+  let cityName = req.query.search_query;
+  let page = req.query.page;
+  let YELP_API_KEY = process.env.YELP_API_KEY;
+  let numberOfPage = 5;
+  let start = ((page - 1) * numberOfPage);
+  let yelpUrl = `https://api.yelp.com/v3/businesses/search?location=${cityName}&limit=${numberOfPage}&offset=${start}`;
+  superagent.get(yelpUrl)
+    .set('Authorization', `Bearer ${YELP_API_KEY}`)
+    .then(value => {
+      let yelpData = value.body;
+      console.log(yelpData);
+      let arr = yelpData.businesses.map((val) => {
+
+        return new Yelp(val);
+      });
+      res.send(arr);
+    })
+    .catch(error => {
+      res.send(error);
+    });
+
+}
+function Yelp(data) {
+  this.name = data.name;
+  this.image_url = data.image_url;
+  this.price = data.price;
+  this.rating = data.rating;
+  this.url = data.url;
+}
+
 
 // Error Route:
 function errorRoute(req, res) {
