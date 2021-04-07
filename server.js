@@ -3,7 +3,7 @@ const express = require('express');
 require('dotenv').config();
 
 const cors = require('cors');
-
+const pg = require('pg');
 const app = express();
 
 const superagent = require('superagent');
@@ -12,7 +12,11 @@ app.use(cors());
 
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+const client = new pg.Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
 
 app.get('/', mainRout);
 app.get('/location', locationRoute);
@@ -31,17 +35,34 @@ function mainRout(request, response) {
 // http://localhost:4000/location?city=amman
 function locationRoute(req, res) {
   let cityName = req.query.city;
-  let GEOCODE_API_KEY = process.env.GEOCODE_API_KEY;
-  let locUrl = `https://us1.locationiq.com/v1/search.php?key=${GEOCODE_API_KEY}&q=${cityName}&format=json`;
-  superagent.get(locUrl)
-    .then(locationData => {
-      let locData = locationData.body;
-      const dataLoc = new Location(cityName, locData);
-      res.send(dataLoc);
 
-    })
-    .catch(error => {
-      res.send(error);
+  let SQL = `SELECT * FROM locations WHERE search_query='${cityName}';`;
+
+  client.query(SQL)
+    .then(results => {
+      if (results.rows.length > 0) {
+        res.send(results.rows[0]);
+      } else {
+
+        let GEOCODE_API_KEY = process.env.GEOCODE_API_KEY;
+        let locUrl = `https://us1.locationiq.com/v1/search.php?key=${GEOCODE_API_KEY}&q=${cityName}&format=json`;
+        superagent.get(locUrl)
+          .then(locationData => {
+            let locData = locationData.body;
+            const dataLoc = new Location(cityName, locData);
+            let SQL = `INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4) RETURNING *;`;
+            let safeValues = [dataLoc.search_query, dataLoc.formatted_query, dataLoc.latitude, dataLoc.longitude];
+            client.query(SQL, safeValues)
+              .then(results => {
+                return results.rows;
+              });
+            res.send(dataLoc);
+
+          })
+          .catch(error => {
+            res.send(error);
+          });
+      }
     });
 }
 
@@ -115,6 +136,9 @@ function errorRoute(req, res) {
 
 
 // listening to PORT
-app.listen(PORT, () => {
-  console.log(`Listening to PORT ${PORT}`);
-});
+client.connect()
+  .then(() => {
+    app.listen(PORT, () =>
+      console.log(`listening on ${PORT}`)
+    );
+  });
